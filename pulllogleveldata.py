@@ -1,10 +1,12 @@
-import json, requests, os, hashlib, sys, time, pickle, getopt, math, ConfigParser
+#!/usr/bin/env python
+
+import json, requests, os, hashlib, sys, time, pickle, getopt, math, configparser
 
 
 
 def checkAuth():
     r = requests.get('http://api.appnexus.com/user')
-    resp = json.loads(r.content)
+    resp = json.loads(r.text)
     if resp['response'].get('status', False) != "OK":
             #print "Auth is good"
             return False
@@ -40,9 +42,9 @@ def getAuth(username, password, cookieFile):
     
     if not cookieJar or not checkAuth():
             r = requests.post(authUrl, data=json.dumps(authPayload))
-            resp = json.loads(r.content)
+            resp = json.loads(r.text)
             if resp['response'].get('status', False) != "OK":
-                print "Auth failed: " + str(resp['response'])
+                print('Auth failed: ' + str(resp['response']))
                 return False
             else:
                 #print "Successfully authenticated"
@@ -54,7 +56,7 @@ def getAuth(username, password, cookieFile):
 def getAvailableLogs(cookieJar):
     logListUrl = 'http://api.appnexus.com/siphon'
     r = requests.get(logListUrl, cookies=cookieJar)
-    resp = json.loads(r.content)["response"]
+    resp = json.loads(r.text)["response"]
 
     if resp.get("status", False) != "OK":
             return False
@@ -65,14 +67,14 @@ def ensureDirExists (path):
     if os.path.isdir(path):
         return True
     elif os.path.exists(path):
-        print "Error: path ("+path+") exists but is not directory"
+        print("Error: path ("+path+") exists but is not directory")
         return False
     else:
         os.makedirs(path)
         if os.path.isdir(path):
             return True
         else:
-            print "Tried to create dir ("+path+") but didn't seem to work"
+            print("Tried to create dir ("+path+") but didn't seem to work")
             return False
 
 
@@ -82,7 +84,7 @@ def isNewLogFile (filename, serverFileMD5):
             if serverFileMD5 == chksumDisk:
               return False
             else:
-              print filename + " exists, but checksum wrong " + chksumDisk + " / " + serverFileMD5
+              print(filename + " exists, but checksum wrong " + chksumDisk + " / " + serverFileMD5)
               return True
     else:
             return True
@@ -147,8 +149,8 @@ def checkDupes (logFiles):
             old = d[k]
             oldTimeStamp = old["timestamp"]
             logTimeStamp = log["timestamp"]
-            print "Found duplicate for log: " + k
-            print "Will keep the one with the newest timestamp ("+oldTimeStamp+" vs "+logTimeStamp+")."
+            print("Found duplicate for log: " + k)
+            print("Will keep the one with the newest timestamp ("+oldTimeStamp+" vs "+logTimeStamp+").")
             if logTimeStamp < oldTimeStamp:
                 log["dupe"] = True
                 k = k + "-" + logTimeStamp
@@ -160,7 +162,7 @@ def checkDupes (logFiles):
                 d[k] = old            
         else:
             d[k] = v
-    return d.values()
+    return list(d.values())
 
 def downloadNewLogs (logFiles, dataDir, filter, url_logDownload, cookieJar, minTimePerRequestInSecs):
     maxRetries = 5
@@ -201,7 +203,7 @@ def downloadNewLogs (logFiles, dataDir, filter, url_logDownload, cookieJar, minT
                   downloadCorrect = False
                   while trys < maxRetries and not downloadCorrect:
 
-                      print "Getting: " + filename + " (try " + str(trys) + ")"
+                      print("Getting: " + filename + " (try " + str(trys) + ")")
                       timeStart = time.time()
                       dlData = downloadFile(url_logDownload, params_logDownload, filename, cookieJar)
                       timeEnd = time.time()
@@ -209,7 +211,7 @@ def downloadNewLogs (logFiles, dataDir, filter, url_logDownload, cookieJar, minT
                       dlSpeedk = round(float(dlData["dlsize"])/1024/timeElapsed, 2)
                       dlActual = round(float(dlData["dlsize"])/1024/1024, 2)
                       dlExpected = round(float(dlData["size"])/1024/1024, 2)
-                      print "\t" + str(dlActual) + " of " + str(dlExpected) + " MB in " + str(round(timeElapsed, 1)) + " seconds ("+str(dlSpeedk)+" kbps)"
+                      print("\t" + str(dlActual) + " of " + str(dlExpected) + " MB in " + str(round(timeElapsed, 1)) + " seconds ("+str(dlSpeedk)+" kbps)")
                       trys += 1
 
                       downloadChecksum = checksum(filename)
@@ -217,17 +219,17 @@ def downloadNewLogs (logFiles, dataDir, filter, url_logDownload, cookieJar, minT
                       if downloadChecksum == anChecksum:
                           downloadCorrect = True
                       else:
-                          print "\tAppNexus Checksum ("+anChecksum+") doesn't match downloaded file ("+downloadChecksum+")."
+                          print("\tAppNexus Checksum ("+anChecksum+") doesn't match downloaded file ("+downloadChecksum+").")
                           
                       sleepTime = minTimePerRequestInSecs - timeElapsed
                       if sleepTime > 0:
-                          print "Sleeping for " + str(sleepTime) + " seconds"
+                          print("Sleeping for " + str(sleepTime) + " seconds")
                           time.sleep(sleepTime)
 
                   if downloadCorrect:
                       numDownloaded += 1
                   else:
-                      print "Failed to successfully download " + filename + ".  Removing."
+                      print("Failed to successfully download " + filename + ".  Removing.")
                       numFailed += 1
                       os.remove(filename)
 
@@ -236,10 +238,10 @@ def downloadNewLogs (logFiles, dataDir, filter, url_logDownload, cookieJar, minT
                   #already have this one
                   numExisting += 1
 
-    print "Skipped " + str(numFiltered) + " (filtered) files"
-    print "Skipped " + str(numExisting) + " (existing) files"
-    print "Downloaded " + str(numDownloaded) + " (new/changed) files"
-    print "Failed to download " + str(numFailed) + " files."
+    print("Skipped " + str(numFiltered) + " (filtered) files")
+    print("Skipped " + str(numExisting) + " (existing) files")
+    print("Downloaded " + str(numDownloaded) + " (new/changed) files")
+    print("Failed to download " + str(numFailed) + " files.")
 
 def main (argv):
   
@@ -253,7 +255,7 @@ def main (argv):
 
     # load config
     configFileAbs = os.path.join(os.path.abspath(os.path.dirname(__file__)), configFile)
-    Config = ConfigParser.ConfigParser()
+    Config = configparser.ConfigParser()
     Config.read(configFileAbs)
     username = Config.get("LoginData", "username")
     password = Config.get("LoginData", "password")
@@ -282,52 +284,49 @@ def main (argv):
     try:
         opts, args = getopt.getopt(argv,"d:f:h")
     except getopt.GetoptError:
-        print usage
+        print(usage)
         sys.exit(2)
     
     filter = ''
     
     for opt, arg in opts:
         if opt == '-h':
-            print usage
+            print(usage)
             sys.exit()
         elif opt in ("-f", "--filter"):
             filter = arg
         elif opt in ("-d", "--datadir"):
             dataDir = arg
         else:
-            print usage
+            print(usage)
             sys.exit()
     
     #
     # Do the work
     #
     try:
-        print "Use CTRL-C to quit.\n"
-        print "Authenticating..."
+        print("Use CTRL-C to quit.\n")
+        print("Authenticating...")
         cookieJar = getAuth(username, password, cookieFile)
         if cookieJar:
-            print "Getting log listing..."
+            print("Getting log listing...")
             logFiles = getAvailableLogs(cookieJar)
             if logFiles:
                 logFiles = checkDupes(logFiles)
                 if ensureDirExists(dataDir):
-                    print "Downloading new log files..."
+                    print("Downloading new log files...")
                     downloadNewLogs(logFiles, dataDir, filter, url_logDownload, cookieJar, minTimePerRequestInSecs)
                 else:
-                    print "Could not create data directory."
+                    print("Could not create data directory.")
             else:
-                print "ERROR: Could not get log listing."
+                print("ERROR: Could not get log listing.")
         else:
-            print "Authentication failed."
+            print("Authentication failed.")
     except KeyboardInterrupt:
-        print "   ...Okay, quitting."
+        print("   ...Okay, quitting.")
         sys.exit(1)
     
     
     
 if __name__ == "__main__":
     main(sys.argv[1:])
-
-
-
