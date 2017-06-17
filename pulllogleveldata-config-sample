@@ -1,0 +1,18 @@
+[LoginData]
+username: apiuser
+password: foobar
+memberId: 911
+
+[Paths]
+# to store to s3 use the full path into your bucket's folder as s3://my-bucket-name/my/data/folder
+dataDir: ./data
+
+[RateLimiting]
+requestsPerMin: 25
+
+# if you use an s3 path, you muay provide the aws credentails to connect to your aws bucket
+# If not provided, the code will use your default credentials as defined in ~/.aws/credentials
+[aws]
+aws_access_key_id = YOUR_ACCESS_KEY
+aws_secret_access_key = YOUR_SECRET_KEY
+region=YOUR_AWS_REGION
