@@ -1,2 +1,6 @@
 /pulllogleveldata-config
 /authCookies
+# Ignore IntelliJ IDEA project files
+*.iml
+*.ipr
+*.iws
