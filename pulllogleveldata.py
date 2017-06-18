@@ -405,8 +405,8 @@ def main (argv):
 					if RateLimitingSection:
 						requestsPerMin = RateLimitingSection.getint("requestsPerMin", requestsPerMin)
 
-					AwsSection = Config["aws"]
-					if AwsSection:
+					if Config.has_section("aws"):
+						AwsSection = Config["aws"]
 						awsAccessKeyId = AwsSection.get("access_key_id", awsAccessKeyId)
 						awsSecret =      AwsSection.get("secret_access_key", awsSecret)
 						awsRegion =      AwsSection.get("region", awsRegion)
@@ -450,14 +450,13 @@ def main (argv):
 
 
 		# First check if there is a -c parameter and if so, reload the configuration from this file before processing the other parameters
-		configFileAbs = os.path.join(os.path.abspath(os.path.dirname(__file__)), configFile)
+		
 		for opt, arg in opts:
 				if opt in ("-c"):
-					configFileAbs = os.path.abspath(arg)
-					if os.path.isfile(configFileAbs) == False:
-						print("Error, custom config file '" + configFileAbs + "' not found!")
-						sys.exit(2)
+					configFile = arg
 
+		# convert the path into an absolute path
+		configFileAbs = os.path.abspath(os.path.expanduser(configFile))
 
 		# Read configuration
 		read_config(configFileAbs)
