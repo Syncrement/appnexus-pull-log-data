@@ -1,10 +1,14 @@
-NOTE:
+#### Syncrement Prefix:
 This is based on a fork of the original script from https://github.com/mattpr/appnexus-pull-log-data
 
-We are modifying it to support dowloading and syncing against a s3 bucket.
+We have modified the original mostly in order for supporting AWS S3 uploading (and made some other improvements on the way).
+Simply put, if you are using an `s3://bucket-name/path` as your dataDir value, and the shell has permissions (or you provided them in the config's `[aws]` section) we will do all the work against your S3 path directly instead of storing files locally.
+We still maintain the checksum test to avoid re-downloading existing files.
+Also note that we updated the script to use Python3 (because we are a new company and we like to start with the most up-to-date standards if possible)
 
-----------------
+___________________
 
+# Read Me
 
 This script enables you to pull "log level data" files from the AppNexus API.  
 
@@ -46,29 +50,40 @@ aws_secret_access_key = YOUR_SECRET_KEY
 region=YOUR_AWS_REGION
 ```
 
+## Before your run it
+_Remember_: This script requires Python 3, and will not compile on earlier versions.
+To ensure all dependencies are installed, run:
+
+ `pip install -r requirements.txt`
+ 
+This should ensure that all the needed dependencies are installed properly
+ 
 ## Run it
 
+_Remember:_ This scripts requires Python 3.
+
 ```
-python pulllogleveldata.py [-c configFilePath] [-d directoryForLogFiles] [-f filter] [-u updatedSince]
+python pulllogleveldata.py [-c configFilePath] [-d directoryForLogFiles] [-f filter] [-u updatedSince] [-s]
 Where:
 - configFilePath: option path to the config file. Default: pulllogleveldata-config in same folder as this script
 - directoryForLogFiles: optional. Default taken from config file. Either a relative or AWS S3 path to where to save the files. if path starts with s3:// than this is the full path to a bucket in s3 to store in, such as s3://my-s3-bucket/my/data/
-- filter: optional: used to filter out specific feed lick feed-standard etc.
+- filter: optional: used to filter out specific feed types. If the path name matches the filter, it will be included.
 - updatedSince: optional YYYY_MM_DD_HH in UTC of the last feed downloaded to prevent going too far in history to match for files.
+- -s optional: split into daily folders: if set, files will be groups by day into a YYYY_MM_DD sub folder for each feed type.
 ```
 
-Running it with no paramters will perform a full update based on the information in the local pulllogleveldata-config file
+Running it with no parameters will perform a full update based on the information in the working dir's `./pulllogleveldata-config` file.
 
-e.g.:  `python pulllogleveldata.py -d "~/an-data/" -f "standard_feed"`
-will save files to an-data directory and only download files that have path/name matching standard_feed.  So you can easily filter to a specific feed or specific date or specific hour.
+e.g.:  `python pulllogleveldata.py -d "./an-data/" -f "standard_feed/2017"`
+will save files to an-data directory and only download files that have path/name matching standard_feed/2017.  So you can easily filter to a specific feed or specific date or specific hour.
 
-e.g.:  `python pulllogleveldata.py -c "~/pulllogleveldata-config" -d "s3://my-s3-bucket-name/an-data/" -u "2017_01-31-14"`
-will save files to the bucket my-s3-bucket-name to a folder an-data/ and only download files that have updated since Jan 31st 2017 at 2pm UTC.
+e.g.:  `python pulllogleveldata.py -c "./config/pulllogleveldata-config" -d "s3://my-s3-bucket-name/an-data/" -u "2017_01_31_14"`
+will save files to the bucket my-s3-bucket-name to a folder an-data/ and only download files that have updated since Jan 31st 2017 at 2 pm UTC at 2pm UTC.
 
-## Other notes
-
-The script checks checksums against any existing files in the specified directory to avoid downloading the same file twice.  Only new/changed files are downloaded.
-For efficient execution, the script will keep information about the last execution in a file named .pull-log-level-data-bookmark in the same folder as the config file to log the last update information, so it can pick from where it left off, in the next execution.
-
-You can run this with cron but not more often than hourly, since the files are generated hourly.
-Note: Per AppNexus logs are kept on the server for up to 10 days.
+## General Notes
+1. This version of the script is adapted to Python 3! It will fail compiling on Python 2.
+1. The script checks for the checksum of the local file against any existing files in the specified directory to avoid downloading the same file twice.  Only new/changed files are downloaded.
+ * in case of s3 storage we keep track of the checksum value on S3 and will only download files if we can't verify the checksum on s3. (We store our own checksum in the metadata of the file, and fallback to the ETag value that in most cases will be of the file's MD5 checksum value, depending on the S3 upload method. Multi-part uploads might have a different checksum than singlepart uploads) 
+1. You can run this with cron but no need to run more often than hourly, since the files are generated hourly on the AppNexus side. 
+1. Per AppNexus logs are kept on the server for up to 10 days, so make sure to run this at least daily to give you enough time to handle issues.
+1. AppNexus my correct files and resend them to you in a later time than the original. In that case, the timestamp will tell when it was updated, while the name will still be of the original time it was referring to.
