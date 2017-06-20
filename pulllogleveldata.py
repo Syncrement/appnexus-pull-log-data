@@ -146,7 +146,7 @@ def buildFileName (dataDir, mergeDailyFolder, logType, logHour, timestamp, part,
 	# 10 character i.e. YYYY_MM_DD/
 	dailyFolder = "" if mergeDailyFolder else (logHour[:10] + "/")
 
-	name = dataDir + "/" + logType + "/" + dailyFolder + logHour
+	name = dataDir.rstrip("/") + "/" + logType + "/" + dailyFolder + logHour
 	if dupe:
 			name += "-dupe-" + timestamp
 	name += "_pt" + part + "." + extension
