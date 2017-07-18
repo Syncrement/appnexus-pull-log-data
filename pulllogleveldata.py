@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import json, requests, os, hashlib, sys, time, pickle, getopt, math, configparser, re, boto3, tempfile
+import json, requests, os, hashlib, sys, time, pickle, getopt, math, configparser, re, boto3, tempfile, datetime
 from urllib.parse import urlparse
 
 
@@ -44,7 +44,7 @@ def getAuth(username, password, cookieFile):
 						r = requests.post(authUrl, data=json.dumps(authPayload))
 						resp = json.loads(r.text)
 						if resp['response'].get('status', False) != "OK":
-								print('Auth failed: ' + str(resp['response']))
+								logMessage("ERROR", 'Auth failed: ' + str(resp['response']))
 								return False
 						else:
 								#print "Successfully authenticated"
@@ -78,7 +78,7 @@ def ensureDirExists (path):
 				# local path and exists
 				return True
 		elif os.path.exists(path):
-				print("Error: path ("+path+") exists but is not directory")
+				logMessage("Error", "path ("+path+") exists but is not directory")
 				return False
 		else:
 				# create local path for the first time
@@ -86,7 +86,7 @@ def ensureDirExists (path):
 				if os.path.isdir(path):
 						return True
 				else:
-						print("Tried to create dir ("+path+") but didn't seem to work")
+						logMessage("ERROR", "Tried to create dir ("+path+") but didn't seem to work")
 						return False
 
 # read the checksum  of the S3 object.
@@ -118,14 +118,14 @@ def isNewLogFile (localFileName, anServerFileMD5):
 		if chksumS3 == anServerFileMD5:
 		    return False
 		else:
-			if chksumS3 != "": print(localFileName + " exists, but checksum wrong '" + chksumS3 + "' / '" + anServerFileMD5 + "'")
+			if chksumS3 != "": logMessage("WARN", localFileName + " exists, but checksum wrong '" + chksumS3 + "' / '" + anServerFileMD5 + "'")
 			return True
 	elif os.path.exists(localFileName):
 		chksumDisk = checksum(localFileName)
 		if anServerFileMD5 == chksumDisk:
 			return False
 		else:
-			print(localFileName + " exists, but checksum wrong '" + chksumDisk + "' / '" + anServerFileMD5 + "'")
+			logMessage("WARN", localFileName + " exists, but checksum wrong '" + chksumDisk + "' / '" + anServerFileMD5 + "'")
 			return True
 	else:
 			return True
@@ -205,8 +205,8 @@ def checkDupes (logFiles):
 						old = d[k]
 						oldTimeStamp = old["timestamp"]
 						logTimeStamp = log["timestamp"]
-						print("Found duplicate for log: " + k)
-						print("Will keep the one with the newest timestamp ("+oldTimeStamp+" vs "+logTimeStamp+").")
+						logMessage("INFO", "Found duplicate for log: " + k)
+						logMessage("INFO", "Will keep the one with the newest timestamp ("+oldTimeStamp+" vs "+logTimeStamp+").")
 						if logTimeStamp < oldTimeStamp:
 								log["dupe"] = True
 								k = k + "-" + logTimeStamp
@@ -267,8 +267,8 @@ def downloadNewLogs (logFiles, dataDir, mergeDailyFolder, filter, url_logDownloa
 										downloadTo = tempfile.NamedTemporaryFile(prefix="~dwnld-", suffix=".gz", delete=True).name
 										
 									while trys < maxRetries and not downloadCorrect:
-
-											print("Getting: " + filename + " (try " + str(trys) + ")")
+										
+											logMessage("INFO", "Getting: " + filename + " (try " + str(trys) + ")")
 											timeStart = time.time()
 											dlData = downloadFile(url_logDownload, params_logDownload, downloadTo, cookieJar)
 											timeEnd = time.time()
@@ -298,18 +298,18 @@ def downloadNewLogs (logFiles, dataDir, mergeDailyFolder, filter, url_logDownloa
 									if downloadCorrect:
 											numDownloaded += 1
 									else:
-											print("Failed to successfully download " + filename + ".  Removing.")
+											logMessage("ERROR", "Failed to successfully download " + filename + ".  Removing.")
 											numFailed += 1
 											os.remove(downloadTo)
 
 							else:
 									#already have this one
 									numExisting += 1
-
-		print("Skipped " + str(numFiltered) + " (filtered) files")
-		print("Skipped " + str(numExisting) + " (existing) files")
-		print("Downloaded " + str(numDownloaded) + " (new/changed) files")
-		print("Failed to download " + str(numFailed) + " files.")
+		
+		logMessage("INFO", "Skipped " + str(numFiltered) + " (filtered) files")
+		logMessage("INFO", "Skipped " + str(numExisting) + " (existing) files")
+		logMessage("INFO", "Downloaded " + str(numDownloaded) + " (new/changed) files")
+		logMessage("INFO" if numFailed == 0 else "ERROR", "Failed to download " + str(numFailed) + " files.")
 
 
 # test that the given path is a valid s3 path that we have permissions to access
@@ -321,7 +321,7 @@ def ensureS3BucketExists(path):
 			# if we are here, bucket exists
 			return (bucketLocation and bucketLocation['LocationConstraint'])
 		except:
-			print("Error: Bucket {0} not found".format(backet))
+			logMessage("Error", "Bucket {0} not found".format(backet))
 			return False
 
 
@@ -350,7 +350,9 @@ def parseS3Path(s3Path):
 	else:
 			raise ValueError ("Illegal s3 path: path must start with s3://bucket-name/", s3Path)
 
-
+def logMessage(level, msg):
+	timeStr = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+	print("{time} {level}: {msg}".format(**{"time": timeStr, "level": level.upper(), "msg": msg}))
 
 
 def main (argv):
@@ -381,7 +383,7 @@ def main (argv):
 			global awsAccessKeyId, awsSecret, awsRegion
 
 			if os.path.isfile(configFileAbs) == False:
-				print("Error: config file '" + configFileAbs + "' not found.")
+				logMessage("Error", "config file '" + configFileAbs + "' not found.")
 				sys.exit(2)
 
 			# load config
@@ -394,7 +396,7 @@ def main (argv):
 						password = LoginDataSection.get("password")
 						memberId = LoginDataSection.get("memberId")
 					else:
-						print("Error: config file must have [LoginData] section defined.")
+						logMessage("Error", "config file must have [LoginData] section defined.")
 						sys.exit(2)
 
 					PathsSection = Config["Paths"]
@@ -416,7 +418,7 @@ def main (argv):
 					minTimePerRequestInSecs = 60/requestsPerMin
 
 			except configparser.NoSectionError as sectionName:
-					print("Error: reading config file '" + configFileAbs + " ': Section not found '" + sectionName + "'")
+					logMessage("Error", "reading config file '" + configFileAbs + " ': Section not found '" + sectionName + "'")
 					sys.exit(2)
 
 			# End of _read_config
@@ -442,7 +444,7 @@ def main (argv):
 		try:
 				opts, args = getopt.getopt(argv,"c:f:d:su:h")
 		except getopt.GetoptError as error:
-				print("Error parsing command line: " + error + "\n\n" + getUsage())
+				logMessage("Error", "parsing command line: " + error + "\n\n" + getUsage())
 				sys.exit(2)
 
 		filter = ''
@@ -490,7 +492,7 @@ def main (argv):
 		#
 		# Do the work
 		#
-		print("Running " + __file__ + " using this configuration:\n \
+		logMessage("INFO", "Running " + __file__ + " using this configuration:\n \
 [LoginData]\n \
 username={0}\n \
 password=*******\n \
@@ -513,24 +515,24 @@ Create daily sub folders={8}\n \
 
 		try:
 				print("Use CTRL-C to quit.\n")
-				print("Authenticating...")
+				logMessage("INFO", "Authenticating...")
 				cookieJar = getAuth(username, password, cookieFile)
 				if cookieJar:
-						print("Getting AppNexus log listing...")
+						logMessage("INFO", "Getting AppNexus log listing...")
 						logFiles = getAvailableLogs(cookieJar, updateSince)
 						if logFiles:
-								print("Choosing new/updated log files to download...")
+								logMessage("INFO","Choosing new/updated log files to download...")
 								logFiles = checkDupes(logFiles)
 								if ensureDirExists(dataDir):
-										print("Downloading new/updated log files...")
+										logMessage("INFO","Downloading new/updated log files...")
 										url_logDownload = 'http://api.appnexus.com/siphon-download?member_id=' + memberId
 										downloadNewLogs(logFiles, dataDir, mergeDailyFolder, filter, url_logDownload, cookieJar, minTimePerRequestInSecs)
 								else:
-										print("ERROR: Could not create data directory.")
+										logMessage("ERROR", "Could not create data directory.")
 						else:
-								print("ERROR: Could not get log listing.")
+								logMessage("ERROR", "Could not get log listing.")
 				else:
-						print("ERROR: AppNexus Authentication failed.")
+						logMessage("ERROR", "AppNexus Authentication failed.")
 		except KeyboardInterrupt:
 				print("   ...Okay, quitting.")
 				sys.exit(1)
